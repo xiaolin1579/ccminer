@@ -53,6 +53,7 @@ void algo_free_all(int thr_id)
 	free_bastion(thr_id);
 	free_bitcore(thr_id);
 	free_blake256(thr_id);
+	free_blake2b(thr_id);
 	free_blake2s(thr_id);
 	free_bmw(thr_id);
 	free_c11(thr_id);
@@ -61,6 +62,7 @@ void algo_free_all(int thr_id)
 	free_decred(thr_id);
 	free_deep(thr_id);
 	free_equihash(thr_id);
+	free_exosis(thr_id);
 	free_keccak256(thr_id);
 	free_fresh(thr_id);
 	free_fugue256(thr_id);
@@ -76,6 +78,7 @@ void algo_free_all(int thr_id)
 	free_luffa(thr_id);
 	free_lyra2(thr_id);
 	free_lyra2v2(thr_id);
+	free_lyra2v3(thr_id);
 	free_lyra2Z(thr_id);
 	free_myriad(thr_id);
 	free_neoscrypt(thr_id);
@@ -91,6 +94,7 @@ void algo_free_all(int thr_id)
 	free_skunk(thr_id);
 	free_sha256d(thr_id);
 	free_sha256t(thr_id);
+	free_sha256q(thr_id);
 	free_sia(thr_id);
 	free_sib(thr_id);
 	free_sonoa(thr_id);
@@ -155,6 +159,22 @@ bool bench_algo_switch_next(int thr_id)
 	// and unwanted ones...
 	if (algo == ALGO_SCRYPT) algo++;
 	if (algo == ALGO_SCRYPT_JANE) algo++;
+
+	// Set cryptonight variant
+	switch (algo) {
+		case ALGO_MONERO:
+			cryptonight_fork = 7;
+			break;
+		case ALGO_GRAFT:
+			cryptonight_fork = 8;
+			break;
+		case ALGO_STELLITE:
+			cryptonight_fork = 3;
+			break;
+		case ALGO_CRYPTONIGHT:
+			cryptonight_fork = 1;
+			break;
+	}
 
 	// free current algo memory and track mem usage
 	mused = cuda_available_memory(thr_id);

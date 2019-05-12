@@ -1,5 +1,5 @@
 
-ccminer 2.3                     "phi2 and cryptonight variants"
+ccminer 2.3.1                     "lyra2v3, exosis and sha256q"
 ---------------------------------------------------------------
 
 ***************************************************************
@@ -52,8 +52,7 @@ SonoA (Sono)
 Tribus (JH, keccak, simd)
 Woodcoin (Double Skein)
 Vanilla (Blake256 8-rounds - double sha256)
-Vertcoin Lyra2RE
-Ziftrcoin (ZR5)
+Vertcoin Lyra2REv3
 Boolberry (Wild Keccak)
 Monero (Cryptonight v7 with -a monero)
 Aeon (Cryptonight-lite)
@@ -89,6 +88,7 @@ its command line interface and options.
                           deep        use to mine Deepcoin
                           dmd-gr      use to mine Diamond-Groestl
                           equihash    use to mine ZEC, HUSH and KMD
+                          exosis      use to mine EXO
                           fresh       use to mine Freshcoin
                           fugue256    use to mine Fuguecoin
                           groestl     use to mine Groestlcoin
@@ -99,7 +99,8 @@ its command line interface and options.
                           lbry        use to mine LBRY Credits
                           luffa       use to mine Joincoin
                           lyra2       use to mine CryptoCoin
-                          lyra2v2     use to mine Vertcoin
+                          lyra2v2     use to mine Monacoin
+                          lyra2v3     use to mine Vertcoin
                           lyra2z      use to mine Zerocoin (XZC)
                           monero      use to mine Monero (XMR)
                           myr-gr      use to mine Myriad-Groest
@@ -116,6 +117,7 @@ its command line interface and options.
                           scrypt-jane use to mine Chacha coins like Cache and Ultracoin
                           s3          use to mine 1coin (ONE)
                           sha256t     use to mine OneCoin (OC)
+                          sha256q     use to mine Pyrite
                           sia         use to mine SIA
                           sib         use to mine Sibcoin
                           skein       use to mine Skeincoin
@@ -288,6 +290,12 @@ so we can more efficiently implement new algorithms using the latest hardware
 features.
 
 >>> RELEASE HISTORY <<<
+  Jan. 30th 2019  v2.3.1
+                  Handle Lyra2v3 algo
+                  Handle sha256q algo
+                  Handle exosis algo
+                  Handle blake2b standard algo
+
   June 23th 2018  v2.3
                   Handle phi2 header variation for smart contracts
                   Handle monero, stellite, graft and cryptolight variants

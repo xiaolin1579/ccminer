@@ -243,6 +243,7 @@ Options:\n\
 			bastion     Hefty bastion\n\
 			bitcore     Timetravel-10\n\
 			blake       Blake 256 (SFR)\n\
+			blake2b     Blake2-B 512 (BCX)\n\
 			blake2s     Blake2-S 256 (NEVA)\n\
 			blakecoin   Fast Blake 256 (8 rounds)\n\
 			bmw         BMW 256\n\
@@ -252,6 +253,7 @@ Options:\n\
 			decred      Decred Blake256\n\
 			deep        Deepcoin\n\
 			equihash    Zcash Equihash\n\
+			exosis      Exosis timetravel\n\
 			dmd-gr      Diamond-Groestl\n\
 			fresh       Freshcoin (shavite 80)\n\
 			fugue256    Fuguecoin\n\
@@ -267,7 +269,8 @@ Options:\n\
 			lbry        LBRY Credits (Sha/Ripemd)\n\
 			luffa       Joincoin\n\
 			lyra2       CryptoCoin\n\
-			lyra2v2     VertCoin\n\
+			lyra2v2     MonaCoin\n\
+			lyra2v3     Vertcoin\n\
 			lyra2z      ZeroCoin (3rd impl)\n\
 			myr-gr      Myriad-Groestl\n\
 			monero      XMR cryptonight (v7)\n\
@@ -281,6 +284,7 @@ Options:\n\
 			qubit       Qubit\n\
 			sha256d     SHA256d (bitcoin)\n\
 			sha256t     SHA256 x3\n\
+			sha256q     SHA256 x4\n\
 			sia         SIA (Blake2B)\n\
 			sib         Sibcoin (X11+Streebog)\n\
 			scrypt      Scrypt\n\
@@ -975,6 +979,7 @@ static bool submit_upstream_work(CURL *curl, struct work *work)
 		case ALGO_BMW:
 		case ALGO_SHA256D:
 		case ALGO_SHA256T:
+		case ALGO_SHA256Q:
 		case ALGO_VANILLA:
 			// fast algos require that... (todo: regen hash)
 			check_dups = true;
@@ -1738,10 +1743,12 @@ static bool stratum_gen_work(struct stratum_ctx *sctx, struct work *work)
 		case ALGO_KECCAKC:
 		case ALGO_LBRY:
 		case ALGO_LYRA2v2:
+		case ALGO_LYRA2v3:
 		case ALGO_LYRA2Z:
 		case ALGO_PHI2:
 		case ALGO_TIMETRAVEL:
 		case ALGO_BITCORE:
+		case ALGO_EXOSIS:
 		case ALGO_X16R:
 		case ALGO_X16S:
 			work_set_target(work, sctx->job.diff / (256.0 * opt_difficulty));
@@ -2255,9 +2262,11 @@ static void *miner_thread(void *userdata)
 			case ALGO_DECRED:
 			case ALGO_SHA256D:
 			case ALGO_SHA256T:
+			case ALGO_SHA256Q:
 			//case ALGO_WHIRLPOOLX:
 				minmax = 0x40000000U;
 				break;
+			case ALGO_BLAKE2B:
 			case ALGO_KECCAK:
 			case ALGO_KECCAKC:
 			case ALGO_LBRY:
@@ -2276,6 +2285,7 @@ static void *miner_thread(void *userdata)
 			case ALGO_JHA:
 			case ALGO_HSR:
 			case ALGO_LYRA2v2:
+			case ALGO_LYRA2v3:
 			case ALGO_PHI:
 			case ALGO_PHI2:
 			case ALGO_POLYTIMOS:
@@ -2283,6 +2293,7 @@ static void *miner_thread(void *userdata)
 			case ALGO_SKUNK:
 			case ALGO_TIMETRAVEL:
 			case ALGO_BITCORE:
+			case ALGO_EXOSIS:
 			case ALGO_X11EVO:
 			case ALGO_X11:
 			case ALGO_X12:
@@ -2372,6 +2383,9 @@ static void *miner_thread(void *userdata)
 		case ALGO_BLAKE:
 			rc = scanhash_blake256(thr_id, &work, max_nonce, &hashes_done, 14);
 			break;
+		case ALGO_BLAKE2B:
+			rc = scanhash_blake2b(thr_id, &work, max_nonce, &hashes_done);
+			break;
 		case ALGO_BLAKE2S:
 			rc = scanhash_blake2s(thr_id, &work, max_nonce, &hashes_done);
 			break;
@@ -2384,6 +2398,9 @@ static void *miner_thread(void *userdata)
 		case ALGO_CRYPTOLIGHT:
 			rc = scanhash_cryptolight(thr_id, &work, max_nonce, &hashes_done, 1);
 			break;
+		case ALGO_MONERO:
+		case ALGO_STELLITE:
+		case ALGO_GRAFT:
 		case ALGO_CRYPTONIGHT:
 		{
 			int cn_variant = 0;
@@ -2460,6 +2477,9 @@ static void *miner_thread(void *userdata)
 		case ALGO_LYRA2v2:
 			rc = scanhash_lyra2v2(thr_id, &work, max_nonce, &hashes_done);
 			break;
+		case ALGO_LYRA2v3:
+			rc = scanhash_lyra2v3(thr_id, &work, max_nonce, &hashes_done);
+			break;
 		case ALGO_LYRA2Z:
 			rc = scanhash_lyra2Z(thr_id, &work, max_nonce, &hashes_done);
 			break;
@@ -2504,6 +2524,9 @@ static void *miner_thread(void *userdata)
 		case ALGO_SHA256T:
 			rc = scanhash_sha256t(thr_id, &work, max_nonce, &hashes_done);
 			break;
+		case ALGO_SHA256Q:
+			rc = scanhash_sha256q(thr_id, &work, max_nonce, &hashes_done);
+			break;
 		case ALGO_SIA:
 			rc = scanhash_sia(thr_id, &work, max_nonce, &hashes_done);
 			break;
@@ -2540,6 +2563,9 @@ static void *miner_thread(void *userdata)
 			break;
 		case ALGO_BITCORE:
 			rc = scanhash_bitcore(thr_id, &work, max_nonce, &hashes_done);
+			break;
+		case ALGO_EXOSIS:
+			rc = scanhash_exosis(thr_id, &work, max_nonce, &hashes_done);
 			break;
 		case ALGO_X11EVO:
 			rc = scanhash_x11evo(thr_id, &work, max_nonce, &hashes_done);
