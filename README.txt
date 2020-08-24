@@ -42,6 +42,7 @@ Pentablake (Blake 512 x5)
 1Coin Triple S
 Neoscrypt (FeatherCoin)
 x11evo (Revolver)
+x11k (Kyanite, Sapphire, Heliodor)
 phi2 (LUXCoin)
 Scrypt and Scrypt:N
 Scrypt-Jane (Chacha)
@@ -119,6 +120,7 @@ its command line interface and options.
                           tribus      use to mine Denarius
                           x11evo      use to mine Revolver
                           x11         use to mine DarkCoin
+                          x11k        use to mine Kyanite, Sapphire, Heliodor
                           x12         use to mine GalaxyCash
                           x13         use to mine X13
                           x14         use to mine X14
