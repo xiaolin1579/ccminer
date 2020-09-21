@@ -63,6 +63,7 @@ enum sha_algos {
 	ALGO_BITCORE,
 	ALGO_X11EVO,
 	ALGO_X11,
+	ALGO_X11K,
 	ALGO_X12,
 	ALGO_X13,
 	ALGO_X14,
