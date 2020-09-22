@@ -21,138 +21,15 @@ extern "C" {
 
 static uint32_t *d_hash[MAX_GPUS];
 
-/*
-extern "C" void *Blake512(void *oHash, const void *iHash, const size_t len)
+extern "C" static void processHash(void *oHash, const void *iHash, const int index, const size_t len)
 {
-        sph_blake512_context ctx_blake;
-
-        sph_blake512_init(&ctx_blake);
-        sph_blake512 (&ctx_blake, iHash, len);
-        sph_blake512_close (&ctx_blake, oHash);
-}
-
-extern "C" void *Bmw512(void *oHash, const void *iHash, const size_t len)
-{
-        sph_bmw512_context ctx_bmw;
-
-        sph_bmw512_init(&ctx_bmw);
-        sph_bmw512 (&ctx_bmw, iHash, len);
-        sph_bmw512_close(&ctx_bmw, oHash);
-}
-
-extern "C" void *Groestl512(void *oHash, const void *iHash, const size_t len)
-{
-        sph_groestl512_context ctx_groestl;
-
-        sph_groestl512_init(&ctx_groestl);
-        sph_groestl512 (&ctx_groestl, iHash, len);
-        sph_groestl512_close(&ctx_groestl, oHash);
-}
-
-extern "C" void *Skein512(void *oHash, const void *iHash, const size_t len)
-{
-        sph_skein512_context ctx_skein;
-
-        sph_skein512_init(&ctx_skein);
-        sph_skein512 (&ctx_skein, iHash, len);
-        sph_skein512_close (&ctx_skein, oHash);
-}
-
-extern "C" void *Jh512(void *oHash, const void *iHash, const size_t len)
-{
-        sph_jh512_context ctx_jh;
-
-        sph_jh512_init(&ctx_jh);
-        sph_jh512 (&ctx_jh, iHash, len);
-        sph_jh512_close(&ctx_jh, oHash);
-}
-
-extern "C" void *Keccak512(void *oHash, const void *iHash, const size_t len)
-{
-        sph_keccak512_context ctx_keccak;
-
-        sph_keccak512_init(&ctx_keccak);
-        sph_keccak512 (&ctx_keccak, iHash, len);
-        sph_keccak512_close(&ctx_keccak, oHash);
-}
-
-extern "C" void *Luffa512(void *oHash, const void *iHash, const size_t len)
-{
-        sph_luffa512_context ctx_luffa1;
-
-        sph_luffa512_init (&ctx_luffa1);
-        sph_luffa512 (&ctx_luffa1, iHash, len);
-        sph_luffa512_close (&ctx_luffa1, oHash);
-}
-
-extern "C" void *Cubehash512(void *oHash, const void *iHash, const size_t len)
-{
-        sph_cubehash512_context ctx_cubehash1;
-
-        sph_cubehash512_init (&ctx_cubehash1);
-        sph_cubehash512 (&ctx_cubehash1, iHash, len);
-        sph_cubehash512_close(&ctx_cubehash1, oHash);
-}
-
-extern "C" void *Shavite512(void *oHash, const void *iHash, const size_t len)
-{
-        sph_shavite512_context ctx_shavite1;
-
-        sph_shavite512_init (&ctx_shavite1);
-        sph_shavite512 (&ctx_shavite1, iHash, len);
-        sph_shavite512_close(&ctx_shavite1, oHash);
-}
-
-extern "C" void *Simd512(void *oHash, const void *iHash, const size_t len)
-{
-        sph_simd512_context     ctx_simd1;
-
-        sph_simd512_init (&ctx_simd1);
-        sph_simd512 (&ctx_simd1, iHash, len);
-        sph_simd512_close(&ctx_simd1, oHash);
-}
-
-extern "C" void *Echo512(void *oHash, const void *iHash, const size_t len)
-{
-        sph_echo512_context     ctx_echo1;
-
-        sph_echo512_init (&ctx_echo1);
-        sph_echo512 (&ctx_echo1, iHash, len);
-        sph_echo512_close(&ctx_echo1, oHash);
-}
-
-
-extern "C" void *fnHashX11K[] = {
-	Blake512,
-	Bmw512,
-	Groestl512,
-	Skein512,
-	Jh512,
-	Keccak512,
-	Luffa512,
-	Cubehash512,
-	Shavite512,
-	Simd512,
-	Echo512,
-};
-*/
-
-void processHash(void *oHash, const void *iHash, const int index, const size_t len)
-{
-	/*
-	void (*hashX11k)(void *oHash, const void *iHash, const size_t len);
-
-	hashX11k = fnHashX11K[index];
-	(*hashX11k)(oHash, iHash, len);
-	*/
-
       switch (index)
       {
       case 0:
         sph_blake512_context ctx_blake;
 
 	sph_blake512_init(&ctx_blake);
-	sph_blake512(&ctx_blake, iHash, 80);
+	sph_blake512(&ctx_blake, iHash, len);
 	sph_blake512_close(&ctx_blake, oHash);
         break;
       case 1:
@@ -231,29 +108,23 @@ void processHash(void *oHash, const void *iHash, const int index, const size_t l
 
 
 // X11K CPU Hash
-const void* memPool = NULL;
-
-void x11khash(void *output, const void *input)
+extern "C" void x11khash(void *output, const void *input)
 {
         const int HASHX11K_NUMBER_ITERATIONS = 64;
         const int HASHX11K_NUMBER_ALGOS = 11;
 
-        if(memPool == NULL) {
-                memPool = (void*) malloc(2 * 64 * 128);
-        }
-
+	//unsigned char _ALIGN(64) hash[128];
 	uint32_t _ALIGN(64) hashA[16], hashB[16];
-        //void * hashA = (void*) memPool + (thr_id * 128);
-        //void * hashB = (void*) memPool + (thr_id * 128) + 64;
-
+	//uint32_t _ALIGN(64) hashA[128], hashB[128];
+	
         // Iteration 0
         processHash(hashA, input, 0, 80);
 
         for(int i = 1; i < HASHX11K_NUMBER_ITERATIONS; i++) {
-        	uint32_t * p = hashA;
+		uint32_t * p = (uint32_t *) hashA;
                 processHash(hashB, hashA, p[i] % HASHX11K_NUMBER_ALGOS, 64);
 
-                memcpy(hashA, hashB, 64);
+		memcpy(hashA, hashB, 64);
         }
 
         memcpy(output, hashA, 32);
@@ -323,53 +194,72 @@ extern "C" int scanhash_x11k(int thr_id, struct work* work, uint32_t max_nonce, 
 		quark_blake512_cpu_hash_80(thr_id, throughput, pdata[19], d_hash[thr_id]);
 		TRACE("blake  :");
 
+		gpulog(LOG_INFO, thr_id, "before for loop");
 		   for (int i = 1; i < 64; i++)
 		   {
-			uint32_t * p = d_hash[thr_id];
+			gpulog(LOG_INFO, thr_id, "before setting p");
+			gpulog(LOG_INFO, thr_id, "d_hash[thr_id] is %c", d_hash[thr_id]);
+
+			uint32_t * p = (uint32_t *) d_hash[thr_id];
+
+			gpulog(LOG_INFO, thr_id, "before switch");
+			gpulog(LOG_INFO, thr_id, "p is %c", p);
+
 			switch (p[i] % 11)
 			{
 
                         case 0:
+				gpulog(LOG_INFO, thr_id, "before blake");
                                 quark_blake512_cpu_hash_64(thr_id, throughput, pdata[19], NULL, d_hash[thr_id], order++);
                                 TRACE("blake  :");
                                 break;
                         case 1:
+				gpulog(LOG_INFO, thr_id, "before quark");
                                 quark_bmw512_cpu_hash_64(thr_id, throughput, pdata[19], NULL, d_hash[thr_id], order++);
                                 TRACE("bmw    :");
                                 break;
                         case 2:
+				gpulog(LOG_INFO, thr_id, "before groestl");
                                 quark_groestl512_cpu_hash_64(thr_id, throughput, pdata[19], NULL, d_hash[thr_id], order++);
                                 TRACE("groestl:");
                                 break;
                         case 3:
+				gpulog(LOG_INFO, thr_id, "before skein");
                                 quark_skein512_cpu_hash_64(thr_id, throughput, pdata[19], NULL, d_hash[thr_id], order++);
                                 TRACE("skein  :");
                                 break;
                         case 4:
+				gpulog(LOG_INFO, thr_id, "before jh");
                                 quark_jh512_cpu_hash_64(thr_id, throughput, pdata[19], NULL, d_hash[thr_id], order++);
                                 TRACE("jh512  :");
                                 break;
                         case 5:
+				gpulog(LOG_INFO, thr_id, "before keccak");
                                 quark_keccak512_cpu_hash_64(thr_id, throughput, pdata[19], NULL, d_hash[thr_id], order++);
                                 TRACE("keccak :");
                                 break;
                         case 6:
+				gpulog(LOG_INFO, thr_id, "before luffa");
                                 x11_luffa512_cpu_hash_64(thr_id, throughput, pdata[19], NULL, d_hash[thr_id], order++);
                                 TRACE("luffa  :");
                                 break;
                         case 7:
+				gpulog(LOG_INFO, thr_id, "before cubehash");
                                 x11_cubehash512_cpu_hash_64(thr_id, throughput, pdata[19], NULL, d_hash[thr_id], order++);
                                 TRACE("cube   :");
                                 break;
                         case 8:
+				gpulog(LOG_INFO, thr_id, "before shavite");
                                 x11_shavite512_cpu_hash_64(thr_id, throughput, pdata[19], NULL, d_hash[thr_id], order++);
                                 TRACE("shavite:");
                                 break;
                         case 9:
+				gpulog(LOG_INFO, thr_id, "before simd");
                                 x11_simd512_cpu_hash_64(thr_id, throughput, pdata[19], NULL, d_hash[thr_id], order++);
                                 TRACE("simd   :");
                                 break;
                         case 10:
+				gpulog(LOG_INFO, thr_id, "before echo");
                                 x11_echo512_cpu_hash_64(thr_id, throughput, pdata[19], NULL, d_hash[thr_id], order++);
                                 TRACE("echo   :");
                                 break;

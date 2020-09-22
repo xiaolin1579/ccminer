@@ -146,6 +146,7 @@ static const char *algo_names[] = {
 	"bitcore",
 	"x11evo",
 	"x11",
+	"x11k",
 	"x12",
 	"x13",
 	"x14",
