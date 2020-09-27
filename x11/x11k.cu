@@ -19,7 +19,7 @@ extern "C" {
 	#include <stdio.h>
 	#include <memory.h>
 	
-	static uint32_t *d_hash[MAX_GPUS] = { 0 };
+	static uint32_t *d_hash[MAX_GPUS];
 	
 	void processHash(void *oHash, const void *iHash, const int index, const size_t len)
 	{
@@ -104,7 +104,7 @@ extern "C" {
 				break;
 		}
 	}
-		
+
 	// X11K CPU Hash
 	const int HASHX11K_NUMBER_ITERATIONS = 64;
 	const int HASHX11K_NUMBER_ALGOS = 11;
@@ -193,10 +193,10 @@ extern "C" {
 			for (int i = 1; i < HASHX11K_NUMBER_ITERATIONS; i++)
 			{	
 				cudaMemcpy(&hash, d_hash[thr_id], 64, cudaMemcpyDeviceToHost);
-				cudaMemcpy(p, (unsigned char *) &hash, 64, cudaMemcpyHostToHost);
+				cudaMemcpy(p, (unsigned char *) d_hash[thr_id], 64, cudaMemcpyDeviceToHost);
 
-				// gpulog(LOG_INFO, thr_id, "i(%u) hash[i] %u", i, hash[i]);
 				// gpulog(LOG_INFO, thr_id, "i(%u) p[i] %u", i, p[i]);
+
 				switch (p[i] % HASHX11K_NUMBER_ALGOS)
 				{
 					case 0:
@@ -246,8 +246,6 @@ extern "C" {
 				}
 			}
 
-			gpulog(LOG_INFO, thr_id, "p %08x", &p);
-			gpulog(LOG_INFO, thr_id, "d_hash[thr_id] %08x", &d_hash[thr_id]);
 
 			*hashes_done = pdata[19] - first_nonce + throughput;
 	
@@ -289,7 +287,9 @@ extern "C" {
 			pdata[19] += throughput;
 	
 		} while (!work_restart[thr_id].restart);
-	
+		gpulog(LOG_INFO, thr_id, "p %08x", p);
+		gpulog(LOG_INFO, thr_id, "d_hash[thr_id] %08x", d_hash[thr_id]);
+
 		*hashes_done = pdata[19] - first_nonce;
 		return 0;
 	}
