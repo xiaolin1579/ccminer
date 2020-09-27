@@ -147,7 +147,7 @@ extern "C" {
 		static unsigned char *p;
 		static uint32_t *r;
 		static uint32_t _ALIGN(64) hash[64/4];
-	
+
 		if (opt_benchmark)
 			ptarget[7] = 0x5;
 	
@@ -192,21 +192,28 @@ extern "C" {
 	
 		do {
 			int order = 0;
-	
+		
 			quark_blake512_cpu_hash_80(thr_id, throughput, pdata[19], d_hash[thr_id]); order++;
 			TRACE("blake  :");
 
+			cudaMemcpy(p, (unsigned char *) d_hash[thr_id], sizeof(d_hash[thr_id]), cudaMemcpyDeviceToHost);
+			cudaMemcpy(r, (uint32_t *) d_hash[thr_id], sizeof(d_hash[thr_id]), cudaMemcpyDeviceToHost);
+			cudaMemcpy(&hash, d_hash[thr_id], 64, cudaMemcpyDeviceToHost);
+
 			for (int i = 1; i < HASHX11K_NUMBER_ITERATIONS; i++)
 			{	
-				cudaMemcpy(p, (unsigned char *) d_hash[thr_id], sizeof(d_hash[thr_id]), cudaMemcpyDeviceToHost);
-				cudaMemcpy(r, (uint32_t *) d_hash[thr_id], sizeof(d_hash[thr_id]), cudaMemcpyDeviceToHost);
-				// cudaMemcpy(&hash, r, 64, cudaMemcpyHostToHost);
-				cudaMemcpy(&hash, d_hash[thr_id], 64, cudaMemcpyDeviceToHost);
+				// cudaMemcpy(p, (unsigned char *) d_hash[thr_id], sizeof(d_hash[thr_id]), cudaMemcpyDeviceToHost);
+				// cudaMemcpy(r, (uint32_t *) d_hash[thr_id], sizeof(d_hash[thr_id]), cudaMemcpyDeviceToHost);
+				// cudaMemcpy(&hash, d_hash[thr_id], 64, cudaMemcpyDeviceToHost);
 
 				// gpulog(LOG_INFO, thr_id, "i(%u) p[i] %u", i, p[i]);
 
 				int index = (p[i]) % HASHX11K_NUMBER_ALGOS;
 				cudaProcessHash(thr_id, throughput, pdata[19], d_hash[thr_id], order, index);
+
+				cudaMemcpy(p, (unsigned char *) d_hash[thr_id], sizeof(d_hash[thr_id]), cudaMemcpyDeviceToHost);
+				cudaMemcpy(r, (uint32_t *) d_hash[thr_id], sizeof(d_hash[thr_id]), cudaMemcpyDeviceToHost);
+				cudaMemcpy(&hash, d_hash[thr_id], 64, cudaMemcpyDeviceToHost);
 			}
 
 

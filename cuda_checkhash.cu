@@ -7,6 +7,7 @@
 #include "miner.h"
 
 #include "cuda_helper.h"
+#include "x11/cuda_x11.h"
 
 __constant__ uint32_t pTarget[8]; // 32 bytes
 
@@ -40,7 +41,7 @@ void cuda_check_cpu_setTarget(const void *ptarget)
 {
 	CUDA_SAFE_CALL(cudaMemcpyToSymbol(pTarget, ptarget, 32, 0, cudaMemcpyHostToDevice));
 }
-
+	
 /* --------------------------------------------------------------------------------------------- */
 
 __device__ __forceinline__
