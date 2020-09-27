@@ -193,7 +193,7 @@ extern "C" {
 			for (int i = 1; i < HASHX11K_NUMBER_ITERATIONS; i++)
 			{	
 				cudaMemcpy(&hash, d_hash[thr_id], 64, cudaMemcpyDeviceToHost);
-				cudaMemcpy(p, (unsigned char *) &hash, 64, cudaMemcpyDeviceToHost);
+				cudaMemcpy(p, (unsigned char *) &hash, 64, cudaMemcpyHostToHost);
 
 				// gpulog(LOG_INFO, thr_id, "i(%u) hash[i] %u", i, hash[i]);
 				// gpulog(LOG_INFO, thr_id, "i(%u) p[i] %u", i, p[i]);
