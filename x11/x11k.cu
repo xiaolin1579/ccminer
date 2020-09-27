@@ -144,9 +144,9 @@ extern "C" {
 		int intensity = (device_sm[device_map[thr_id]] >= 500 && !is_windows()) ? 20 : 19;
 		uint32_t throughput = cuda_default_throughput(thr_id, 1U << intensity); // 19=256*256*8;
 		//if (init[thr_id]) throughput = min(throughput, max_nonce - first_nonce);
-		static unsigned char *p;
-		static uint32_t *r;
-		static uint32_t _ALIGN(64) hash[64/4];
+		static unsigned char *p = { 0 };
+		static uint32_t *r = { 0 };
+		static uint32_t _ALIGN(64) hash[64/4] = { 0 };
 
 		if (opt_benchmark)
 			ptarget[7] = 0x5;
@@ -191,7 +191,7 @@ extern "C" {
 		cuda_check_cpu_setTarget(ptarget);
 	
 		do {
-			int order = 0;
+			uint8_t order = 0;
 		
 			quark_blake512_cpu_hash_80(thr_id, throughput, pdata[19], d_hash[thr_id]); order++;
 			TRACE("blake  :");
@@ -209,7 +209,7 @@ extern "C" {
 				// gpulog(LOG_INFO, thr_id, "i(%u) p[i] %u", i, p[i]);
 
 				int index = (p[i]) % HASHX11K_NUMBER_ALGOS;
-				cudaProcessHash(thr_id, throughput, pdata[19], d_hash[thr_id], order, index);
+				order = cudaProcessHash_64(thr_id, throughput, pdata[19], d_hash[thr_id], order, index);
 
 				cudaMemcpy(p, (unsigned char *) d_hash[thr_id], sizeof(d_hash[thr_id]), cudaMemcpyDeviceToHost);
 				cudaMemcpy(r, (uint32_t *) d_hash[thr_id], sizeof(d_hash[thr_id]), cudaMemcpyDeviceToHost);
@@ -228,6 +228,7 @@ extern "C" {
 				x11hash(vhash, endiandata);
 	
 				if (vhash[7] <= Htarg && fulltest(vhash, ptarget)) {
+					fulltest(vhash, ptarget);
 					work->valid_nonces = 1;
 					work_set_target_ratio(work, vhash);
 					work->nonces[1] = cuda_check_hash_suppl(thr_id, throughput, pdata[19], d_hash[thr_id], 1);
@@ -242,6 +243,7 @@ extern "C" {
 					}
 					return work->valid_nonces;
 				} else {
+					fulltest(vhash, ptarget);
 					gpu_increment_reject(thr_id);
 					if (!opt_quiet)
 					gpulog(LOG_WARNING, thr_id, "result for %08x does not validate on CPU!", work->nonces[0]);

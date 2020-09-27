@@ -20,7 +20,7 @@ __constant__ uint32_t pTarget[8]; // 32 bytes
  /* --------------------------------------------------------------------------------------------- */
  
 __host__
-void cudaProcessHash(const int thr_id, const uint32_t throughput, uint32_t nonce, uint32_t *d_outputHash, int order, const int index)
+uint8_t cudaProcessHash_64(const int thr_id, const uint32_t throughput, uint32_t nonce, uint32_t *d_outputHash, uint8_t order, const int index)
 {
 	switch (index)
 	{
@@ -58,4 +58,6 @@ void cudaProcessHash(const int thr_id, const uint32_t throughput, uint32_t nonce
 			x11_echo512_cpu_hash_64(thr_id, throughput, nonce, NULL, d_outputHash, order++);
 			break;
 	}
+
+	return order;
 }
