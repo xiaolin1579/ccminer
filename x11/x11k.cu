@@ -15,6 +15,7 @@ extern "C" {
 	#include "miner.h"
 	#include "cuda_helper.h"
 	#include "cuda_x11.h"
+	#include "x11/cuda_x11k.cu"
 	
 	#include <stdio.h>
 	#include <memory.h>
@@ -134,7 +135,7 @@ extern "C" {
 	#include "cuda_debug.cuh"
 	
 	static bool init[MAX_GPUS] = { 0 };
-	
+
 	extern "C" int scanhash_x11k(int thr_id, struct work* work, uint32_t max_nonce, unsigned long *hashes_done)
 	{
 		uint32_t *pdata = work->data;
@@ -144,7 +145,8 @@ extern "C" {
 		uint32_t throughput = cuda_default_throughput(thr_id, 1U << intensity); // 19=256*256*8;
 		//if (init[thr_id]) throughput = min(throughput, max_nonce - first_nonce);
 		static unsigned char *p;
-		static uint32_t _ALIGN(64) hash[64];
+		static uint32_t *r;
+		static uint32_t _ALIGN(64) hash[64/4];
 	
 		if (opt_benchmark)
 			ptarget[7] = 0x5;
@@ -173,7 +175,8 @@ extern "C" {
 				return 0;
 			}
 			CUDA_CALL_OR_RET_X(cudaMalloc(&d_hash[thr_id], (size_t) 64 * throughput), 0);
-			CUDA_CALL_OR_RET_X(cudaMallocManaged(&p, (size_t) 64 * throughput), 0);
+			CUDA_CALL_OR_RET_X(cudaMallocHost(&p, (size_t) 64 * throughput), 0);
+			CUDA_CALL_OR_RET_X(cudaMallocHost(&r, (size_t) 64 * throughput), 0);
 
 			cuda_check_cpu_init(thr_id, throughput);
 	
@@ -190,60 +193,20 @@ extern "C" {
 		do {
 			int order = 0;
 	
+			quark_blake512_cpu_hash_80(thr_id, throughput, pdata[19], d_hash[thr_id]); order++;
+			TRACE("blake  :");
+
 			for (int i = 1; i < HASHX11K_NUMBER_ITERATIONS; i++)
 			{	
+				cudaMemcpy(p, (unsigned char *) d_hash[thr_id], sizeof(d_hash[thr_id]), cudaMemcpyDeviceToHost);
+				cudaMemcpy(r, (uint32_t *) d_hash[thr_id], sizeof(d_hash[thr_id]), cudaMemcpyDeviceToHost);
+				// cudaMemcpy(&hash, r, 64, cudaMemcpyHostToHost);
 				cudaMemcpy(&hash, d_hash[thr_id], 64, cudaMemcpyDeviceToHost);
-				cudaMemcpy(p, (unsigned char *) d_hash[thr_id], 64, cudaMemcpyDeviceToHost);
 
 				// gpulog(LOG_INFO, thr_id, "i(%u) p[i] %u", i, p[i]);
 
-				switch (p[i] % HASHX11K_NUMBER_ALGOS)
-				{
-					case 0:
-						quark_blake512_cpu_hash_64(thr_id, throughput, pdata[19], NULL, d_hash[thr_id], order++);
-						TRACE("blake  :");
-						break;
-					case 1:
-						quark_bmw512_cpu_hash_64(thr_id, throughput, pdata[19], NULL, d_hash[thr_id], order++);
-						TRACE("bmw    :");
-						break;
-					case 2:
-						quark_groestl512_cpu_hash_64(thr_id, throughput, pdata[19], NULL, d_hash[thr_id], order++);
-						TRACE("groestl:");
-						break;
-					case 3:
-						quark_skein512_cpu_hash_64(thr_id, throughput, pdata[19], NULL, d_hash[thr_id], order++);
-						TRACE("skein  :");
-						break;
-					case 4:
-						quark_jh512_cpu_hash_64(thr_id, throughput, pdata[19], NULL, d_hash[thr_id], order++);
-						TRACE("jh512  :");
-						break;
-					case 5:
-						quark_keccak512_cpu_hash_64(thr_id, throughput, pdata[19], NULL, d_hash[thr_id], order++);
-						TRACE("keccak :");
-						break;
-					case 6:
-						x11_luffa512_cpu_hash_64(thr_id, throughput, pdata[19], NULL, d_hash[thr_id], order++);
-						TRACE("luffa  :");
-						break;
-					case 7:
-						x11_cubehash512_cpu_hash_64(thr_id, throughput, pdata[19], NULL, d_hash[thr_id], order++);
-						TRACE("cube   :");
-						break;
-					case 8:
-						x11_shavite512_cpu_hash_64(thr_id, throughput, pdata[19], NULL, d_hash[thr_id], order++);
-						TRACE("shavite:");
-						break;
-					case 9:
-						x11_simd512_cpu_hash_64(thr_id, throughput, pdata[19], NULL, d_hash[thr_id], order++);
-						TRACE("simd   :");
-						break;
-					case 10:
-						x11_echo512_cpu_hash_64(thr_id, throughput, pdata[19], NULL, d_hash[thr_id], order++);
-						TRACE("echo   :");
-						break;
-				}
+				int index = (p[i]) % HASHX11K_NUMBER_ALGOS;
+				cudaProcessHash(thr_id, throughput, pdata[19], d_hash[thr_id], order, index);
 			}
 
 
@@ -287,8 +250,10 @@ extern "C" {
 			pdata[19] += throughput;
 	
 		} while (!work_restart[thr_id].restart);
-		gpulog(LOG_INFO, thr_id, "p %08x", p);
-		gpulog(LOG_INFO, thr_id, "d_hash[thr_id] %08x", d_hash[thr_id]);
+		gpulog(LOG_INFO, thr_id, "p %08x", *p);
+		gpulog(LOG_INFO, thr_id, "r %08x", *r);
+		gpulog(LOG_INFO, thr_id, "hash[0] %08x", hash[0]);
+		gpulog(LOG_INFO, thr_id, "d_hash[thr_id] %08x", (unsigned char *) d_hash[thr_id]);
 
 		*hashes_done = pdata[19] - first_nonce;
 		return 0;

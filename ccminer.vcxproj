@@ -586,6 +586,7 @@
     <CudaCompile Include="x11\veltor.cu" />
     <CudaCompile Include="x11\x11.cu" />
     <CudaCompile Include="x11\x11k.cu" />
+    <CudaCompile Include="x11\cuda_x11k.cu" />
     <CudaCompile Include="x11\x11evo.cu" />
     <CudaCompile Include="x12\x12.cu" />
     <CudaCompile Include="x13\cuda_x13_hamsi512.cu">
