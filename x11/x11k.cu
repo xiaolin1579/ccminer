@@ -15,7 +15,7 @@ extern "C" {
 	#include "miner.h"
 	#include "cuda_helper.h"
 	#include "cuda_x11.h"
-	#include "x11/cuda_x11k.cu"
+	// #include "x11/cuda_x11k.cu"
 	
 	#include <stdio.h>
 	#include <memory.h>
@@ -114,12 +114,15 @@ extern "C" {
 	{
 		static uint32_t _ALIGN(64) hashA[64/4], hashB[64/4];
 		static unsigned char *p;
+		static char index_sequence[64];
 		
 		// Iteration 0
 		processHash(hashA, input, 0, 80);
 
 		for(int i = 1; i < HASHX11K_NUMBER_ITERATIONS; i++) {
 			p = (unsigned char *) hashA;
+			index_sequence[i] = p[i] % HASHX11K_NUMBER_ALGOS;
+
 
 			processHash(hashB, hashA, p[i] % HASHX11K_NUMBER_ALGOS, 64);
 
@@ -127,8 +130,93 @@ extern "C" {
 		}
 
 		memcpy(output, hashA, 32);
+
+		applog(LOG_DEBUG, "************************************************");
+		applog(LOG_DEBUG, "cpu->p %08x", *p);
+		applog(LOG_DEBUG, "cpu->output %08x", output);
+		applog(LOG_DEBUG, "cpu->hashA %08x", hashA[0]);
+		applog(LOG_DEBUG, "cpu->index_sequence %08x", (unsigned char *) index_sequence[0]);
+		applog(LOG_DEBUG, "================================================");
 	}
 
+
+	void get_seed_index(void *output, void *input)
+	{
+		output = (unsigned char *) input;
+	}
+
+	int cuda_process_hash_64(const int thr_id, const uint32_t throughput, uint32_t nonce, uint32_t *d_outputHash, int order, const int index)
+	{
+		switch (index)
+		{
+			case 0:
+				quark_blake512_cpu_hash_64(thr_id, throughput, nonce, NULL, d_outputHash, order++);
+				break;
+			case 1:
+				quark_bmw512_cpu_hash_64(thr_id, throughput, nonce, NULL, d_outputHash, order++);
+				break;
+			case 2:
+				quark_groestl512_cpu_hash_64(thr_id, throughput, nonce, NULL, d_outputHash, order++);
+				break;
+			case 3:
+				quark_skein512_cpu_hash_64(thr_id, throughput, nonce, NULL, d_outputHash, order++);
+				break;
+			case 4:
+				quark_jh512_cpu_hash_64(thr_id, throughput, nonce, NULL, d_outputHash, order++);
+				break;
+			case 5:
+				quark_keccak512_cpu_hash_64(thr_id, throughput, nonce, NULL, d_outputHash, order++);
+				break;
+			case 6:
+				x11_luffa512_cpu_hash_64(thr_id, throughput, nonce, NULL, d_outputHash, order++);
+				break;
+			case 7:
+				x11_cubehash512_cpu_hash_64(thr_id, throughput, nonce, NULL, d_outputHash, order++);
+				break;
+			case 8:
+				x11_shavite512_cpu_hash_64(thr_id, throughput, nonce, NULL, d_outputHash, order++);
+				break;
+			case 9:
+				x11_simd512_cpu_hash_64(thr_id, throughput, nonce, NULL, d_outputHash, order++);
+				break;
+			case 10:
+				x11_echo512_cpu_hash_64(thr_id, throughput, nonce, NULL, d_outputHash, order++);
+				break;
+		}
+	
+		return order;
+	}
+
+	int cuda_x11k_hash(const int thr_id, const uint32_t throughput, uint32_t nonce, uint32_t *d_outputHash, int order, const int number_of_iterations, const int number_of_algos)
+	{
+		static unsigned char *index_seed;
+		static uint32_t *output;
+		static uint32_t _ALIGN(64) hash[64/4];
+	
+		CUDA_CALL_OR_RET_X(cudaMallocHost(&index_seed, sizeof(unsigned char)), 0);
+		CUDA_CALL_OR_RET_X(cudaMallocHost(&output, sizeof(uint32_t)), 0);
+	
+		// Iteration 0
+		quark_blake512_cpu_hash_80(thr_id, throughput, nonce, d_outputHash); order++;
+	
+		cudaMemcpy(index_seed, d_outputHash, sizeof(unsigned char), cudaMemcpyDeviceToHost);
+		cudaMemcpy(output, d_outputHash, sizeof(uint32_t), cudaMemcpyDeviceToHost);
+		cudaMemcpy(&hash, d_outputHash, sizeof(uint32_t), cudaMemcpyDeviceToHost);
+	
+		for (int i = 1; i < number_of_iterations; i++)
+		{
+			int index = *index_seed % number_of_algos;
+			order = cuda_process_hash_64(thr_id, throughput, nonce, d_outputHash, order, index);
+		}
+	
+		applog(LOG_DEBUG, "----------------------------------");
+		applog(LOG_DEBUG, "GPU->index_seed %08x", *index_seed);
+		applog(LOG_DEBUG, "GPU->output %08x", output);
+		applog(LOG_DEBUG, "GPU->hash %08x", hash[0]);
+
+		return order;
+	}
+	
 	
 	//#define _DEBUG
 	#define _DEBUG_PREFIX "x11k"
@@ -144,13 +232,11 @@ extern "C" {
 		int intensity = (device_sm[device_map[thr_id]] >= 500 && !is_windows()) ? 20 : 19;
 		uint32_t throughput = cuda_default_throughput(thr_id, 1U << intensity); // 19=256*256*8;
 		//if (init[thr_id]) throughput = min(throughput, max_nonce - first_nonce);
-		static unsigned char *p = { 0 };
-		static uint32_t *r = { 0 };
-		static uint32_t _ALIGN(64) hash[64/4] = { 0 };
 
-		if (opt_benchmark)
-			ptarget[7] = 0x5;
-	
+		if (opt_benchmark) {
+			((uint32_t*)ptarget)[7] = 0x003f;
+		}
+		
 		if (!init[thr_id])
 		{
 			cudaSetDevice(device_map[thr_id]);
@@ -175,8 +261,6 @@ extern "C" {
 				return 0;
 			}
 			CUDA_CALL_OR_RET_X(cudaMalloc(&d_hash[thr_id], (size_t) 64 * throughput), 0);
-			CUDA_CALL_OR_RET_X(cudaMallocHost(&p, (size_t) 64 * throughput), 0);
-			CUDA_CALL_OR_RET_X(cudaMallocHost(&r, (size_t) 64 * throughput), 0);
 
 			cuda_check_cpu_init(thr_id, throughput);
 	
@@ -191,50 +275,29 @@ extern "C" {
 		cuda_check_cpu_setTarget(ptarget);
 	
 		do {
-			uint8_t order = 0;
-		
-			quark_blake512_cpu_hash_80(thr_id, throughput, pdata[19], d_hash[thr_id]); order++;
-			TRACE("blake  :");
+			int order = 0;
 
-			cudaMemcpy(p, (unsigned char *) d_hash[thr_id], sizeof(d_hash[thr_id]), cudaMemcpyDeviceToHost);
-			cudaMemcpy(r, (uint32_t *) d_hash[thr_id], sizeof(d_hash[thr_id]), cudaMemcpyDeviceToHost);
-			cudaMemcpy(&hash, d_hash[thr_id], 64, cudaMemcpyDeviceToHost);
-
-			for (int i = 1; i < HASHX11K_NUMBER_ITERATIONS; i++)
-			{	
-				// cudaMemcpy(p, (unsigned char *) d_hash[thr_id], sizeof(d_hash[thr_id]), cudaMemcpyDeviceToHost);
-				// cudaMemcpy(r, (uint32_t *) d_hash[thr_id], sizeof(d_hash[thr_id]), cudaMemcpyDeviceToHost);
-				// cudaMemcpy(&hash, d_hash[thr_id], 64, cudaMemcpyDeviceToHost);
-
-				// gpulog(LOG_INFO, thr_id, "i(%u) p[i] %u", i, p[i]);
-
-				int index = (p[i]) % HASHX11K_NUMBER_ALGOS;
-				order = cudaProcessHash_64(thr_id, throughput, pdata[19], d_hash[thr_id], order, index);
-
-				cudaMemcpy(p, (unsigned char *) d_hash[thr_id], sizeof(d_hash[thr_id]), cudaMemcpyDeviceToHost);
-				cudaMemcpy(r, (uint32_t *) d_hash[thr_id], sizeof(d_hash[thr_id]), cudaMemcpyDeviceToHost);
-				cudaMemcpy(&hash, d_hash[thr_id], 64, cudaMemcpyDeviceToHost);
-			}
-
+			order = cuda_x11k_hash(thr_id, throughput, pdata[19], d_hash[thr_id], order, HASHX11K_NUMBER_ITERATIONS, HASHX11K_NUMBER_ALGOS);
 
 			*hashes_done = pdata[19] - first_nonce + throughput;
 	
 			work->nonces[0] = cuda_check_hash(thr_id, throughput, pdata[19], d_hash[thr_id]);
+
 			if (work->nonces[0] != UINT32_MAX)
 			{
 				const uint32_t Htarg = ptarget[7];
+
 				uint32_t _ALIGN(64) vhash[8];
 				be32enc(&endiandata[19], work->nonces[0]);
-				x11hash(vhash, endiandata);
+				x11khash(vhash, endiandata);
 	
 				if (vhash[7] <= Htarg && fulltest(vhash, ptarget)) {
-					fulltest(vhash, ptarget);
 					work->valid_nonces = 1;
 					work_set_target_ratio(work, vhash);
 					work->nonces[1] = cuda_check_hash_suppl(thr_id, throughput, pdata[19], d_hash[thr_id], 1);
 					if (work->nonces[1] != 0) {
 						be32enc(&endiandata[19], work->nonces[1]);
-						x11hash(vhash, endiandata);
+						x11khash(vhash, endiandata);
 						bn_set_target_ratio(work, vhash, 1);
 						work->valid_nonces++;
 						pdata[19] = max(work->nonces[0], work->nonces[1]) + 1;
@@ -243,10 +306,10 @@ extern "C" {
 					}
 					return work->valid_nonces;
 				} else {
-					fulltest(vhash, ptarget);
 					gpu_increment_reject(thr_id);
 					if (!opt_quiet)
-					gpulog(LOG_WARNING, thr_id, "result for %08x does not validate on CPU!", work->nonces[0]);
+						gpulog(LOG_WARNING, thr_id, "result for %08x does not validate on CPU! (threads = %u, vhash[7] = %08x, ptarget[7] = %08x, endiandata = %08x)", work->nonces[0], gpu_threads, vhash[7], ptarget[7], endiandata);
+
 					pdata[19] = work->nonces[0] + 1;
 					continue;
 				}
@@ -259,10 +322,6 @@ extern "C" {
 			pdata[19] += throughput;
 	
 		} while (!work_restart[thr_id].restart);
-		gpulog(LOG_INFO, thr_id, "p %08x", *p);
-		gpulog(LOG_INFO, thr_id, "r %08x", *r);
-		gpulog(LOG_INFO, thr_id, "hash[0] %08x", hash[0]);
-		gpulog(LOG_INFO, thr_id, "d_hash[thr_id] %08x", (unsigned char *) d_hash[thr_id]);
 
 		*hashes_done = pdata[19] - first_nonce;
 		return 0;
