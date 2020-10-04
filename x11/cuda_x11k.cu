@@ -20,7 +20,7 @@ __constant__ uint32_t pTarget[8]; // 32 bytes
  /* --------------------------------------------------------------------------------------------- */
  
 __host__
-uint8_t cudaProcessHash_64(const int thr_id, const uint32_t throughput, uint32_t nonce, uint32_t *d_outputHash, uint8_t order, const int index)
+int cuda_process_hash_64(const int thr_id, const uint32_t throughput, uint32_t nonce, uint32_t *d_outputHash, int order, const int index)
 {
 	switch (index)
 	{
@@ -61,3 +61,26 @@ uint8_t cudaProcessHash_64(const int thr_id, const uint32_t throughput, uint32_t
 
 	return order;
 }
+
+__host__
+int cuda_x11k_hash(const int thr_id, const uint32_t throughput, uint32_t nonce, uint32_t *d_outputHash, int order, const int number_of_iterations, const int number_of_algos)
+{
+	static unsigned char *index_seed;
+	uint32_t _ALIGN(64) vhash[8];
+
+	CUDA_CALL_OR_RET_X(cudaMalloc(&index_seed, sizeof(unsigned char)), 0);
+
+	// Iteration 0
+	quark_blake512_cpu_hash_80(thr_id, throughput, nonce, d_outputHash); order++;
+
+	cudaMemcpy(index_seed, (unsigned char *) d_outputHash, sizeof(unsigned char), cudaMemcpyDeviceToDevice);
+
+	for (int i = 1; i < number_of_iterations; i++)
+	{	
+		int index = (index_seed[i]) % number_of_algos;
+		order = cuda_process_hash_64(thr_id, throughput, nonce, d_outputHash, order, index);
+	}
+
+	return order;
+}
+
