@@ -7,6 +7,7 @@
 #include "miner.h"
 
 #include "cuda_helper.h"
+#include "x11/cuda_x11.h"
 
 __constant__ uint32_t pTarget[8]; // 32 bytes
 
@@ -126,7 +127,10 @@ uint32_t cuda_check_hash(int thr_id, uint32_t threads, uint32_t startNounce, uin
 	dim3 block(threadsperblock);
 
 	if (bench_algo >= 0) // dont interrupt the global benchmark
+	{
+		applog(LOG_DEBUG, "bench_algo >= 0");
 		return UINT32_MAX;
+	}
 
 	if (!init_done) {
 		applog(LOG_ERR, "missing call to cuda_check_cpu_init");
